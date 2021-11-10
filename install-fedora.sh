@@ -20,9 +20,13 @@ systemdsrvc_d=/lib/systemd/system
 workspace=$(mktemp -d)
 installationfolder=$workspace/$daemonname
 
-git clone ${DESKPI_GITHUB_URL:-https://github.com/DeskPi-Team/deskpi.git} $installationfolder
+git clone ${DESKPI_GIT_URL:-https://github.com/DeskPi-Team/deskpi.git} $installationfolder
 
 pushd $workspace >/dev/null
+
+if [[ -n $DESKPI_GIT_BRANCH ]]; then
+    git checkout $DESKPI_GIT_BRANCH
+fi
 
 # install DeskPi stuff.
 echo "DeskPi Fan control script installation Start." 
