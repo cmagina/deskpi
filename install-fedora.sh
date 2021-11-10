@@ -1,6 +1,6 @@
 #!/bin/bash
 # 
-set -eux -o pipefail
+set -eu -o pipefail
 
 function pre-reqs() {
     sudo dnf install git redhat-lsb-core glibc-devel glibc-common glibc-static gcc make -y || true
@@ -111,5 +111,5 @@ log_success_msg "DeskPi PWM Fan Control and Safeshut Service installed successfu
 echo "System will reboot in 5 seconds to take effect." 
 sudo sync
 sleep 5 
-# sudo reboot
+sudo reboot
 echo "Reboot system for changes to take effect"
