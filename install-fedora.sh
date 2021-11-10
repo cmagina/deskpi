@@ -20,7 +20,7 @@ systemdsrvc_d=/lib/systemd/system
 workspace=$(mktemp -d)
 installationfolder=$workspace/$daemonname
 
-git clone https://github.com/DeskPi-Team/deskpi.git $installationfolder
+git clone ${DESKPI_GITHUB_URL:-https://github.com/DeskPi-Team/deskpi.git} $installationfolder
 
 pushd $workspace >/dev/null
 
