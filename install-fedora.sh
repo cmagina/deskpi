@@ -13,16 +13,16 @@ fi
 . /lib/lsb/init-functions
 
 daemonname="deskpi"
-tempmonscript=/usr/local/bin/pmwFanControl
 deskpidaemon=$daemonname.service
 safeshutdaemon=$daemonname-safeshut.service
 systemdsrvc_d=/lib/systemd/system
 workspace=$(mktemp -d)
-installationfolder=$workspace/$daemonname
+src_d=$workspace/$daemonname
+dest_bin_dir=/usr/local/bin
 
-git clone ${DESKPI_GIT_URL:-https://github.com/DeskPi-Team/deskpi.git} $installationfolder
+git clone ${DESKPI_GIT_URL:-https://github.com/DeskPi-Team/deskpi.git} $src_d
 
-pushd $installationfolder >/dev/null
+pushd $src_d >/dev/null
 
 if [[ -n $DESKPI_GIT_BRANCH ]]; then
     git checkout $DESKPI_GIT_BRANCH
@@ -47,16 +47,16 @@ fi
 # install PWM fan control daemon.
 echo "DeskPi main control service loaded."
 
-pushd $installationfolder/drivers/c/ >/dev/null
+pushd $src_d/drivers/c/ >/dev/null
 make clean
 make
 sudo make install
 popd >/dev/null
 
-sudo install --mode 0755 --context=system_u:object_r:bin_t:s0 -t /usr/bin \
-    $installationfolder/deskpi-config \
-    $installationfolder/Deskpi-uninstall
-sudo restorecon -vr /usr/bin/
+sudo install --mode 0755 --context=system_u:object_r:bin_t:s0 -t $dest_bin_dir \
+    $src_d/deskpi-config \
+    $src_d/Deskpi-uninstall
+sudo restorecon -vr $dest_bin_dir
 
 # Build Fan Daemon
 tee $deskpidaemon <<EOF
@@ -67,7 +67,7 @@ After=multi-user.target
 [Service]
 Type=simple
 RemainAfterExit=no
-ExecStart=/usr/bin/pwmFanControl
+ExecStart=$dest_bin_dir/pwmFanControl
 
 [Install]
 WantedBy=multi-user.target
@@ -83,7 +83,7 @@ DefaultDependencies=no
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/fanStop
+ExecStart=$dest_bin_dir/fanStop
 RemainAfterExit=yes
 TimeoutSec=1
 
