@@ -1,8 +1,9 @@
 #!/bin/bash
 # 
+set -eux -o pipefail
 
 function pre-reqs() {
-    sudo dnf install git redhat-lsb-core glibc-devel.aarch64 glibc-headers-s390.noarch glibc-headers-x86.noarch glibc-common.aarch64 glibc-static gcc make -y
+    sudo dnf install git redhat-lsb-core glibc-devel glibc-common glibc-static gcc make -y || true
 }
 
 if [[ ! -f /lib/lsb/init-functions ]]; then
@@ -10,17 +11,21 @@ if [[ ! -f /lib/lsb/init-functions ]]; then
 fi
 
 . /lib/lsb/init-functions
-cd ~
-sh -c "git clone https://github.com/DeskPi-Team/deskpi.git"
-cd $HOME/deskpi/
-daemonname="deskpi"
-tempmonscript=/usr/bin/pmwFanControl
-deskpidaemon=/lib/systemd/system/$daemonname.service
-safeshutdaemon=/lib/systemd/system/$daemonname-safeshut.service
-installationfolder=$HOME/$daemonname
 
-# install wiringPi library.
-echo "DeskPi Fan control script installation Start." 
+daemonname="deskpi"
+tempmonscript=/usr/local/bin/pmwFanControl
+deskpidaemon=$daemonname.service
+safeshutdaemon=$daemonname-safeshut.service
+systemdsrvc_d=/lib/systemd/system
+workspace=$(mktemp -d)
+installationfolder=$workspace/$daemonname
+
+git clone https://github.com/DeskPi-Team/deskpi.git $installationfolder
+
+pushd $workspace >/dev/null
+
+# install DeskPi stuff.
+log_action_msg "DeskPi Fan control script installation Start." 
 
 # Create service file on system.
 if [ -e $deskpidaemon ]; then
@@ -36,69 +41,71 @@ if [ $? -eq 0 ]; then
 fi
 
 # install PWM fan control daemon.
-echo "DeskPi main control service loaded."
-cd $installationfolder/drivers/c/
+log_action_msg "DeskPi main control service loaded."
+
+pushd $installationfolder/drivers/c/ >/dev/null
 make clean
 make
-sudo cp -rf $installationfolder/drivers/c/pwmControlFan /usr/bin/
-sudo cp -rf $installationfolder/drivers/c/fanStop  /usr/bin/
-sudo chmod 755 /usr/bin/pwmControlFan
-sudo chcon -u system_u -t bin_t /usr/bin/pwmControlFan
-sudo chmod 755 /usr/bin/fanStop
-sudo chcon -u system_u -t bin_t /usr/bin/fanStop
-sudo cp -rf $installationfolder/deskpi-config /usr/bin/
-sudo cp -rf $installationfolder/Deskpi-uninstall /usr/bin/
-sudo chmod 755 /usr/bin/deskpi-config
-sudo chcon -u system_u -t bin_t /usr/bin/deskpi-config
-sudo chmod 755 /usr/bin/Deskpi-uninstall
-sudo chcon -u system_u -t bin_t /usr/bin/Deskpi-uninstall
+sudo make install
+popd >/dev/null
+
+sudo install --mode 0755 --context=system_u:object_r:bin_t:s0 -t /usr/bin \
+    $installationfolder/deskpi-config \
+    $installationfolder/Deskpi-uninstall
 sudo restorecon -vr /usr/bin/
 
 # Build Fan Daemon
-echo "[Unit]" > $deskpidaemon
-echo "Description=DeskPi PWM Control Fan Service" >> $deskpidaemon
-echo "After=multi-user.target" >> $deskpidaemon
-echo "[Service]" >> $deskpidaemon
-echo "Type=simple" >> $deskpidaemon
-echo "RemainAfterExit=no" >> $deskpidaemon
-echo "ExecStart=/usr/bin/pwmControlFan" >> $deskpidaemon
-echo "[Install]" >> $deskpidaemon
-echo "WantedBy=multi-user.target" >> $deskpidaemon
+tee $deskpidaemon <<EOF
+[Unit]
+Description=DeskPi PWM Control Fan Service
+After=multi-user.target
+
+[Service]
+Type=simple
+RemainAfterExit=no
+ExecStart=/usr/bin/pwmFanControl
+
+[Install]
+WantedBy=multi-user.target
+EOF
 
 # send signal to MCU before system shuting down.
-echo "[Unit]" > $safeshutdaemon
-echo "Description=DeskPi Safeshutdown Service" >> $safeshutdaemon
-echo "Conflicts=reboot.target" >> $safeshutdaemon
-echo "Before=halt.target shutdown.target poweroff.target" >> $safeshutdaemon
-echo "DefaultDependencies=no" >> $safeshutdaemon
-echo "[Service]" >> $safeshutdaemon
-echo "Type=oneshot" >> $safeshutdaemon
-echo "ExecStart=/usr/bin/fanStop" >> $safeshutdaemon
-echo "RemainAfterExit=yes" >> $safeshutdaemon
-echo "TimeoutSec=1" >> $safeshutdaemon
-echo "[Install]" >> $safeshutdaemon
-echo "WantedBy=halt.target shutdown.target poweroff.target" >> $safeshutdaemon
+tee $safeshutdaemon <<EOF
+[Unit]
+Description=DeskPi Safeshutdown Service
+Conflicts=reboot.target
+Before=halt.target shutdown.target poweroff.target
+DefaultDependencies=no
 
-echo "DeskPi Service configuration finished." 
-sudo chown root:root $safeshutdaemon
-sudo chmod 644 $safeshutdaemon
-chcon -u system_u -t systemd_unit_file_t $safeshutdaemon
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/fanStop
+RemainAfterExit=yes
+TimeoutSec=1
 
-sudo chown root:root $deskpidaemon
-sudo chmod 644 $deskpidaemon
-chcon -u system_u -t systemd_unit_file_t $deskpidaemon
-restorecon -vr /lib/systemd/system/
+[Install]
+WantedBy=halt.target shutdown.target poweroff.target
+EOF
 
-echo "DeskPi Service Load module." 
+log_action_msg "DeskPi Service configuration finished." 
+sudo install -o root -g root -m 0644 --context=system_u:object_r:bin_t:s0 \
+    -t $systemdsrvcd $safeshutdaemon $deskpidaemon
+
+log_action_msg "DeskPi Service Load module." 
 sudo systemctl daemon-reload
 sudo systemctl enable $daemonname.service
 sudo systemctl start $daemonname.service &
 sudo systemctl enable $daemonname-safeshut.service
 
+# Cleanup
+popd >/dev/null
+rm -rf $workspace
+
 # Finished 
 log_success_msg "DeskPi PWM Fan Control and Safeshut Service installed successfully." 
 # greetings and require rebooting system to take effect.
-echo "System will reboot in 5 seconds to take effect." 
+log_action_msg "System will reboot in 5 seconds to take effect." 
 sudo sync
 sleep 5 
-sudo reboot
+# sudo reboot
+echo "Reboot system for changes to take effect"
