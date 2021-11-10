@@ -22,7 +22,7 @@ installationfolder=$workspace/$daemonname
 
 git clone ${DESKPI_GIT_URL:-https://github.com/DeskPi-Team/deskpi.git} $installationfolder
 
-pushd $workspace >/dev/null
+pushd $installationfolder >/dev/null
 
 if [[ -n $DESKPI_GIT_BRANCH ]]; then
     git checkout $DESKPI_GIT_BRANCH
