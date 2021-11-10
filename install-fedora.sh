@@ -25,7 +25,7 @@ git clone ${DESKPI_GITHUB_URL:-https://github.com/DeskPi-Team/deskpi.git} $insta
 pushd $workspace >/dev/null
 
 # install DeskPi stuff.
-log_action_msg "DeskPi Fan control script installation Start." 
+echo "DeskPi Fan control script installation Start." 
 
 # Create service file on system.
 if [ -e $deskpidaemon ]; then
@@ -41,7 +41,7 @@ if [ $? -eq 0 ]; then
 fi
 
 # install PWM fan control daemon.
-log_action_msg "DeskPi main control service loaded."
+echo "DeskPi main control service loaded."
 
 pushd $installationfolder/drivers/c/ >/dev/null
 make clean
@@ -87,11 +87,11 @@ TimeoutSec=1
 WantedBy=halt.target shutdown.target poweroff.target
 EOF
 
-log_action_msg "DeskPi Service configuration finished." 
+echo "DeskPi Service configuration finished." 
 sudo install -o root -g root -m 0644 --context=system_u:object_r:bin_t:s0 \
     -t $systemdsrvcd $safeshutdaemon $deskpidaemon
 
-log_action_msg "DeskPi Service Load module." 
+echo "DeskPi Service Load module." 
 sudo systemctl daemon-reload
 sudo systemctl enable $daemonname.service
 sudo systemctl start $daemonname.service &
@@ -104,7 +104,7 @@ rm -rf $workspace
 # Finished 
 log_success_msg "DeskPi PWM Fan Control and Safeshut Service installed successfully." 
 # greetings and require rebooting system to take effect.
-log_action_msg "System will reboot in 5 seconds to take effect." 
+echo "System will reboot in 5 seconds to take effect." 
 sudo sync
 sleep 5 
 # sudo reboot
