@@ -93,7 +93,7 @@ EOF
 
 echo "DeskPi Service configuration finished." 
 sudo install -o root -g root -m 0644 --context=system_u:object_r:bin_t:s0 \
-    -t $systemdsrvcd $safeshutdaemon $deskpidaemon
+    -t $systemdsrvc_d $safeshutdaemon $deskpidaemon
 
 echo "DeskPi Service Load module." 
 sudo systemctl daemon-reload
