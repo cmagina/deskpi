@@ -21,6 +21,8 @@ deskpi_src_d=$workspace/$daemonname
 userland_src_d=$workspace/userland
 dest_bin_dir=/usr/local/bin
 
+pushd $workspace >/dev/null
+
 echo "Install Raspberry Pi userland tools ..."
 git clone ${RPI_USERLAND_GIT_URL:-https://github.com/raspberrypi/userland.git}  $userland_src_d
 
@@ -51,7 +53,6 @@ popd >/dev/null
 echo "Install udev permissions for vchiq ..."
 curl -O https://raw.githubusercontent.com/sakaki-/genpi64-overlay/master/media-libs/raspberrypi-userland/files/92-local-vchiq-permissions.rules
 sudo install -o root -g root -m 0644 92-local-vchiq-permissions.rules /usr/lib/udev/rules.d/
-sudo udevadm trigger /dev/vchiq
 sudo usermod -aG video $USER
 
 echo "Install deskpi software ..."
@@ -135,6 +136,8 @@ sudo systemctl daemon-reload
 sudo systemctl enable $daemonname.service
 sudo systemctl start $daemonname.service &
 sudo systemctl enable $daemonname-safeshut.service
+
+popd >/dev/null # deskpi_src_d
 
 # Cleanup
 popd >/dev/null
