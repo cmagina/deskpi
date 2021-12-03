@@ -36,7 +36,6 @@ fi
 
 sudo tee /etc/ld.so.conf.d/vc.conf <<EOF
 /opt/vc/lib
-
 EOF
 
 sudo ldconfig
@@ -45,10 +44,14 @@ sudo tee /etc/profile.d/raspberrypi.sh <<EOF
 # Add raspberry pi userland tools to PATH
 
 export PATH=$PATH:/opt/vc/bin/
-
 EOF
 
 popd >/dev/null
+
+sudo tee /lib/modules-load.d/vchiq.conf <<EOF
+# This entry ensures that the kernel module bcm2835-mmal-vchiq.ko is loaded at boot time.
+bcm2835-mmal-vchiq
+EOF
 
 echo "Install udev permissions for vchiq ..."
 curl -O https://raw.githubusercontent.com/sakaki-/genpi64-overlay/master/media-libs/raspberrypi-userland/files/92-local-vchiq-permissions.rules
