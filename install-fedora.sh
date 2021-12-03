@@ -3,7 +3,7 @@
 set -eu -o pipefail
 
 function pre-reqs() {
-    sudo dnf install git redhat-lsb-core glibc-devel glibc-common glibc-static gcc make -y || true
+    sudo dnf install git redhat-lsb-core glibc-devel glibc-common glibc-static gcc make cmake gcc-c++ -y || true
 }
 
 if [[ ! -f /lib/lsb/init-functions ]]; then
@@ -17,12 +17,47 @@ deskpidaemon=$daemonname.service
 safeshutdaemon=$daemonname-safeshut.service
 systemdsrvc_d=/lib/systemd/system
 workspace=$(mktemp -d)
-src_d=$workspace/$daemonname
+deskpi_src_d=$workspace/$daemonname
+userland_src_d=$workspace/userland
 dest_bin_dir=/usr/local/bin
 
-git clone ${DESKPI_GIT_URL:-https://github.com/DeskPi-Team/deskpi.git} $src_d
+echo "Install Raspberry Pi userland tools ..."
+git clone ${RPI_USERLAND_GIT_URL:-https://github.com/raspberrypi/userland.git}  $userland_src_d
 
-pushd $src_d >/dev/null
+pushd $userland_src_d >/dev/null
+
+if [[ -n ${RPI_USERLAND_GIT_BRANCH:-} ]]; then
+    git checkout $RPI_USERLAND_GIT_BRANCH
+fi
+
+./buildme --aarch64
+
+sudo tee /etc/ld.so.conf.d/vc.conf <<EOF
+/opt/vc/lib
+
+EOF
+
+sudo ldconfig
+
+sudo tee /etc/profile.d/raspberrypi.sh <<EOF
+# Add raspberry pi userland tools to PATH
+
+export PATH=$PATH:/opt/vc/bin/
+
+EOF
+
+popd >/dev/null
+
+echo "Install udev permissions for vchiq ..."
+curl -O https://raw.githubusercontent.com/sakaki-/genpi64-overlay/master/media-libs/raspberrypi-userland/files/92-local-vchiq-permissions.rules
+sudo install -o root -g root -m 0644 92-local-vchiq-permissions.rules /usr/lib/udev/rules.d/
+sudo udevadm trigger /dev/vchiq
+sudo usermod -aG video $USER
+
+echo "Install deskpi software ..."
+git clone ${DESKPI_GIT_URL:-https://github.com/DeskPi-Team/deskpi.git} $deskpi_src_d
+
+pushd $deskpi_src_d >/dev/null
 
 if [[ -n ${DESKPI_GIT_BRANCH:-} ]]; then
     git checkout $DESKPI_GIT_BRANCH
@@ -47,15 +82,15 @@ fi
 # install PWM fan control daemon.
 echo "DeskPi main control service loaded."
 
-pushd $src_d/drivers/c/ >/dev/null
+pushd $deskpi_src_d/drivers/c/ >/dev/null
 make clean
 make
 sudo make install
 popd >/dev/null
 
 sudo install --mode 0755 --context=system_u:object_r:bin_t:s0 -t $dest_bin_dir \
-    $src_d/deskpi-config \
-    $src_d/Deskpi-uninstall
+    $deskpi_src_d/deskpi-config \
+    $deskpi_src_d/Deskpi-uninstall
 sudo restorecon -vr $dest_bin_dir
 
 # Build Fan Daemon
