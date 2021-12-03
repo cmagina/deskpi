@@ -24,7 +24,7 @@ git clone ${DESKPI_GIT_URL:-https://github.com/DeskPi-Team/deskpi.git} $src_d
 
 pushd $src_d >/dev/null
 
-if [[ -n $DESKPI_GIT_BRANCH ]]; then
+if [[ -n ${DESKPI_GIT_BRANCH:-} ]]; then
     git checkout $DESKPI_GIT_BRANCH
 fi
 
